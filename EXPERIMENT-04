@@ -1,0 +1,131 @@
+-- DBMS EXPERIMENT NO. 4
+-- Joins, subqueries, set-operation simulations and EXPLAIN
+-- MySQL 8.0+ | Requires Experiment 3 database: enterprise_db
+
+USE enterprise_db;
+
+-- 1. INNER JOIN: employees with department and location
+SELECT e.emp_id, e.emp_name, d.dept_name, d.location
+FROM Employee AS e
+INNER JOIN Department AS d ON e.dept_id = d.dept_id
+ORDER BY d.dept_name, e.emp_name;
+
+-- 2. LEFT JOIN: retain every employee; show project information if assigned
+SELECT e.emp_id, e.emp_name, d.dept_name, p.project_name
+FROM Employee AS e
+LEFT JOIN Department AS d ON e.dept_id = d.dept_id
+LEFT JOIN Employee_Project AS ep ON e.emp_id = ep.emp_id
+LEFT JOIN Project AS p ON ep.project_id = p.project_id
+ORDER BY e.emp_id, p.project_name;
+
+-- 3. SELF-JOIN: unique pairs of employees in the same department
+-- a.emp_id < b.emp_id avoids reversed duplicates and self-pairs
+SELECT a.emp_name AS employee_a, b.emp_name AS employee_b, d.dept_name
+FROM Employee AS a
+INNER JOIN Employee AS b
+    ON a.dept_id = b.dept_id AND a.emp_id < b.emp_id
+INNER JOIN Department AS d ON a.dept_id = d.dept_id
+ORDER BY d.dept_name, employee_a, employee_b;
+
+-- 4. Employee + Department + Project (bridge table required for many-to-many)
+-- This uses four physical tables: Employee, Department, Employee_Project, Project
+SELECT e.emp_id, e.emp_name, d.dept_name, p.project_name, ep.hours_worked
+FROM Employee AS e
+INNER JOIN Department AS d ON e.dept_id = d.dept_id
+INNER JOIN Employee_Project AS ep ON e.emp_id = ep.emp_id
+INNER JOIN Project AS p ON ep.project_id = p.project_id
+WHERE ep.hours_worked >= 120
+ORDER BY ep.hours_worked DESC, e.emp_name;
+
+-- 5. CORRELATED SUBQUERY: salary above the average salary of own department
+SELECT e.emp_id, e.emp_name, e.dept_id, e.salary
+FROM Employee AS e
+WHERE e.salary > (
+    SELECT AVG(x.salary)
+    FROM Employee AS x
+    WHERE x.dept_id = e.dept_id
+)
+ORDER BY e.salary DESC, e.emp_name;
+
+-- 6. EXISTS: departments with at least one employee earning over 85,000
+SELECT d.dept_id, d.dept_name
+FROM Department AS d
+WHERE EXISTS (
+    SELECT 1
+    FROM Employee AS e
+    WHERE e.dept_id = d.dept_id
+      AND e.salary > 85000
+)
+ORDER BY d.dept_id;
+
+-- 7. SIMULATED INTERSECT:
+-- Employees with a project assignment AND in a department whose average
+-- salary is greater than 75,000.
+SELECT e.emp_id, e.emp_name
+FROM Employee AS e
+WHERE EXISTS (
+    SELECT 1
+    FROM Employee_Project AS ep
+    WHERE ep.emp_id = e.emp_id
+)
+AND e.dept_id IN (
+    SELECT x.dept_id
+    FROM Employee AS x
+    GROUP BY x.dept_id
+    HAVING AVG(x.salary) > 75000
+)
+ORDER BY e.emp_id;
+
+-- 8. SIMULATED EXCEPT: employees not assigned to Predictive AI
+SELECT e.emp_id, e.emp_name
+FROM Employee AS e
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM Employee_Project AS ep
+    INNER JOIN Project AS p ON p.project_id = ep.project_id
+    WHERE ep.emp_id = e.emp_id
+      AND p.project_name = 'Predictive AI'
+)
+ORDER BY e.emp_id;
+
+-- 9. EXPLAIN: multi-table project workload query
+EXPLAIN
+SELECT e.emp_name, d.dept_name, p.project_name, ep.hours_worked
+FROM Employee AS e
+INNER JOIN Department AS d ON e.dept_id = d.dept_id
+INNER JOIN Employee_Project AS ep ON e.emp_id = ep.emp_id
+INNER JOIN Project AS p ON ep.project_id = p.project_id
+WHERE ep.hours_worked >= 120
+ORDER BY ep.hours_worked DESC;
+
+-- 10. EXPLAIN: correlated salary query
+EXPLAIN
+SELECT e.emp_id, e.emp_name, e.salary
+FROM Employee AS e
+WHERE e.salary > (
+    SELECT AVG(x.salary)
+    FROM Employee AS x
+    WHERE x.dept_id = e.dept_id
+);
+
+-- 11. OPTIONAL: MySQL 8.0.18+ supports EXPLAIN ANALYZE (it executes the query)
+-- EXPLAIN ANALYZE
+-- SELECT e.emp_name, d.dept_name
+-- FROM Employee AS e
+-- INNER JOIN Department AS d ON e.dept_id = d.dept_id;
+
+-- 12. OPTIONAL INDEX EXPERIMENT: uncomment and run once, then rerun EXPLAIN.
+-- Primary keys already create indexes. With only 30 employees, index benefits
+-- may be too small to measure. Avoid creating the same index twice.
+-- CREATE INDEX idx_employee_dept_salary ON Employee (dept_id, salary);
+-- CREATE INDEX idx_employee_project_project ON Employee_Project (project_id, emp_id);
+-- CREATE INDEX idx_employee_project_hours ON Employee_Project (hours_worked);
+
+-- 13. Verify Experiment 3 data exists
+SELECT 'Department' AS table_name, COUNT(*) AS record_count FROM Department
+UNION ALL
+SELECT 'Employee', COUNT(*) FROM Employee
+UNION ALL
+SELECT 'Project', COUNT(*) FROM Project
+UNION ALL
+SELECT 'Employee_Project', COUNT(*) FROM Employee_Project;
