@@ -1,0 +1,179 @@
+-- Experiment 6: Stored Procedure, Validation, Error Handling and Triggers
+
+CREATE DATABASE IF NOT EXISTS experiment6_db;
+USE experiment6_db;
+
+-- Reset objects so the script can be rerun
+DROP TRIGGER IF EXISTS salary_audit_after_update;
+DROP TRIGGER IF EXISTS validate_salary_before_update;
+DROP TRIGGER IF EXISTS validate_salary_before_insert;
+DROP PROCEDURE IF EXISTS transfer_employee;
+DROP TABLE IF EXISTS salary_audit;
+DROP TABLE IF EXISTS employee;
+DROP TABLE IF EXISTS department;
+
+-- 1. Create department table
+CREATE TABLE department (
+    department_id INT PRIMARY KEY,
+    department_name VARCHAR(50) NOT NULL
+);
+
+-- 2. Create employee table
+CREATE TABLE employee (
+    employee_id INT PRIMARY KEY,
+    employee_name VARCHAR(100) NOT NULL,
+    department_id INT,
+    salary DECIMAL(10,2) NOT NULL,
+    CONSTRAINT fk_employee_department
+        FOREIGN KEY (department_id) REFERENCES department(department_id)
+);
+
+-- 3. Insert sample departments
+INSERT INTO department (department_id, department_name) VALUES
+(1, 'IT'),
+(2, 'HR'),
+(3, 'Finance');
+
+-- 4. Insert sample employees
+INSERT INTO employee (employee_id, employee_name, department_id, salary) VALUES
+(101, 'Amit', 1, 90000.00),
+(102, 'Neha', 1, 65000.00),
+(103, 'Rahul', 2, 60000.00),
+(104, 'Priya', 3, 80000.00);
+
+-- 5. Create salary audit table
+CREATE TABLE salary_audit (
+    audit_id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id INT NOT NULL,
+    old_salary DECIMAL(10,2) NOT NULL,
+    new_salary DECIMAL(10,2) NOT NULL,
+    changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6. Stored procedure: transfer employee to another department
+DELIMITER //
+
+CREATE PROCEDURE transfer_employee(
+    IN emp_id INT,
+    IN new_dept_id INT
+)
+BEGIN
+    DECLARE employee_count INT DEFAULT 0;
+    DECLARE department_count INT DEFAULT 0;
+
+    -- Roll back and re-raise the original SQL error to the caller.
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
+    SELECT COUNT(*) INTO employee_count
+    FROM employee
+    WHERE employee_id = emp_id;
+
+    IF employee_count = 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Employee does not exist';
+    END IF;
+
+    SELECT COUNT(*) INTO department_count
+    FROM department
+    WHERE department_id = new_dept_id;
+
+    IF department_count = 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Department does not exist';
+    END IF;
+
+    UPDATE employee
+    SET department_id = new_dept_id
+    WHERE employee_id = emp_id;
+
+    COMMIT;
+
+    SELECT 'Employee transferred successfully.' AS message;
+END //
+
+DELIMITER ;
+
+-- 7. Trigger: validate salary before insert
+DELIMITER //
+
+CREATE TRIGGER validate_salary_before_insert
+BEFORE INSERT ON employee
+FOR EACH ROW
+BEGIN
+    IF NEW.salary IS NULL OR NEW.salary <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Salary must be greater than zero';
+    END IF;
+END //
+
+DELIMITER ;
+
+-- 8. Trigger: validate salary before update
+DELIMITER //
+
+CREATE TRIGGER validate_salary_before_update
+BEFORE UPDATE ON employee
+FOR EACH ROW
+BEGIN
+    IF NEW.salary IS NULL OR NEW.salary <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Salary must be greater than zero';
+    END IF;
+END //
+
+DELIMITER ;
+
+-- 9. Trigger: audit salary changes only
+DELIMITER //
+
+CREATE TRIGGER salary_audit_after_update
+AFTER UPDATE ON employee
+FOR EACH ROW
+BEGIN
+    IF NOT (OLD.salary <=> NEW.salary) THEN
+        INSERT INTO salary_audit (employee_id, old_salary, new_salary)
+        VALUES (OLD.employee_id, OLD.salary, NEW.salary);
+    END IF;
+END //
+
+DELIMITER ;
+
+-- =========================
+-- TESTS (run one by one)
+-- =========================
+
+-- Test A: Valid transfer (employee 102 from IT to HR)
+CALL transfer_employee(102, 2);
+SELECT * FROM employee WHERE employee_id = 102;
+
+-- Test B: Invalid employee ID. Expected error: Employee does not exist.
+-- Run separately because the expected error stops a multi-statement batch.
+-- CALL transfer_employee(999, 2);
+
+-- Test C: Invalid department ID. Expected error: Department does not exist.
+-- Run separately.
+-- CALL transfer_employee(102, 99);
+
+-- Test D: Invalid salary on UPDATE. Expected error; salary stays unchanged.
+-- Run separately.
+-- UPDATE employee SET salary = -5000 WHERE employee_id = 101;
+
+-- Test E: Invalid salary on INSERT. Expected error.
+-- Run separately.
+-- INSERT INTO employee (employee_id, employee_name, department_id, salary)
+-- VALUES (105, 'Test User', 1, 0);
+
+-- Test F: Valid salary update (creates an audit row)
+UPDATE employee
+SET salary = 95000.00
+WHERE employee_id = 101;
+
+-- Display audit log and final employee data
+SELECT * FROM salary_audit ORDER BY audit_id;
+SELECT * FROM employee ORDER BY employee_id;
