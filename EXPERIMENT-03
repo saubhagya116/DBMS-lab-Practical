@@ -1,0 +1,239 @@
+-- ============================================================
+-- DBMS EXPERIMENT NO. 3
+-- Employee-Department-Project Database
+-- ============================================================
+
+-- Create and select the database
+CREATE DATABASE IF NOT EXISTS enterprise_db;
+USE enterprise_db;
+
+-- Drop child tables first so the script can be executed again safely
+DROP TABLE IF EXISTS Employee_Project;
+DROP TABLE IF EXISTS Employee;
+DROP TABLE IF EXISTS Project;
+DROP TABLE IF EXISTS Department;
+
+-- ============================================================
+-- 1. CREATE TABLES (PRIMARY KEY, FOREIGN KEY, NOT NULL)
+-- ============================================================
+
+CREATE TABLE Department (
+    dept_id INT PRIMARY KEY,
+    dept_name VARCHAR(50) NOT NULL UNIQUE,
+    location VARCHAR(50)
+);
+
+CREATE TABLE Project (
+    project_id INT PRIMARY KEY,
+    project_name VARCHAR(80) NOT NULL UNIQUE,
+    budget DECIMAL(12,2) NOT NULL CHECK (budget >= 0)
+);
+
+CREATE TABLE Employee (
+    emp_id INT PRIMARY KEY,
+    emp_name VARCHAR(60) NOT NULL,
+    dept_id INT NOT NULL,
+    salary DECIMAL(10,2) NOT NULL CHECK (salary >= 0),
+    hire_date DATE NOT NULL,
+    CONSTRAINT fk_employee_department
+        FOREIGN KEY (dept_id) REFERENCES Department(dept_id)
+);
+
+-- Bridge table: an employee can work on multiple projects,
+-- and a project can have multiple employees.
+CREATE TABLE Employee_Project (
+    emp_id INT NOT NULL,
+    project_id INT NOT NULL,
+    hours_worked INT NOT NULL CHECK (hours_worked >= 0),
+    PRIMARY KEY (emp_id, project_id),
+    CONSTRAINT fk_ep_employee
+        FOREIGN KEY (emp_id) REFERENCES Employee(emp_id),
+    CONSTRAINT fk_ep_project
+        FOREIGN KEY (project_id) REFERENCES Project(project_id)
+);
+
+-- ============================================================
+-- 2. INSERT DEPARTMENTS (5 RECORDS)
+-- ============================================================
+
+INSERT INTO Department (dept_id, dept_name, location) VALUES
+(1, 'Research & Development', 'Tower A'),
+(2, 'Sales',                  'Tower B'),
+(3, 'Finance',                'Tower C'),
+(4, 'Customer Support',       'Tower D'),
+(5, 'Operations',             'Tower E');
+
+-- ============================================================
+-- 3. INSERT PROJECTS (8 RECORDS)
+-- ============================================================
+
+INSERT INTO Project (project_id, project_name, budget) VALUES
+(201, 'Smart Inventory', 1750000.00),
+(202, 'FinTech Portal', 2400000.00),
+(203, 'CRM Revamp', 1350000.00),
+(204, 'Cloud Security', 2800000.00),
+(205, 'Predictive AI', 3100000.00),
+(206, 'Logistics Suite', 1900000.00),
+(207, 'HR Automation', 1100000.00),
+(208, 'Mobile Commerce', 1600000.00);
+
+-- ============================================================
+-- 4. INSERT EMPLOYEES (30 RECORDS; 6 PER DEPARTMENT)
+-- ============================================================
+
+INSERT INTO Employee (emp_id, emp_name, dept_id, salary, hire_date) VALUES
+(1,  'Vihaan Sharma',  1, 91000.00, '2022-01-14'),
+(2,  'Myra Kapoor',    1, 83000.00, '2023-05-21'),
+(3,  'Reyansh Mehta',  1, 97000.00, '2021-07-09'),
+(4,  'Kiara Nair',     1, 76000.00, '2024-01-18'),
+(5,  'Atharv Joshi',   1, 88000.00, '2022-11-27'),
+(6,  'Anvi Rao',       1, 72000.00, '2024-06-03'),
+(7,  'Dhruv Bhatia',   2, 69000.00, '2023-02-12'),
+(8,  'Navya Iyer',     2, 75000.00, '2022-08-17'),
+(9,  'Ayaan Sethi',    2, 62000.00, '2024-03-06'),
+(10, 'Tara Malhotra',  2, 81000.00, '2021-10-24'),
+(11, 'Rudra Shah',     2, 73000.00, '2023-09-15'),
+(12, 'Ishani Arora',   2, 66000.00, '2024-05-02'),
+(13, 'Samar Jain',     3, 94000.00, '2021-03-11'),
+(14, 'Aarohi Sen',     3, 87000.00, '2022-06-29'),
+(15, 'Yuvan Khanna',   3, 99000.00, '2020-12-18'),
+(16, 'Avika Das',      3, 78000.00, '2023-04-07'),
+(17, 'Parth Sood',     3, 85000.00, '2022-09-13'),
+(18, 'Mahi Kapoor',    3, 71000.00, '2024-02-26'),
+(19, 'Aadvik Roy',     4, 64000.00, '2023-01-31'),
+(20, 'Zoya Khan',      4, 70000.00, '2022-07-16'),
+(21, 'Laksh Verma',    4, 59000.00, '2024-04-12'),
+(22, 'Sia Gupta',      4, 68000.00, '2023-11-08'),
+(23, 'Rishaan Bose',   4, 76000.00, '2021-05-19'),
+(24, 'Amaira Singh',   4, 61000.00, '2024-07-22'),
+(25, 'Arnav Pillai',   5, 82000.00, '2022-02-04'),
+(26, 'Vanya Dutta',    5, 74000.00, '2023-06-18'),
+(27, 'Kiaan Yadav',    5, 93000.00, '2021-09-25'),
+(28, 'Ira Mukherjee',  5, 67000.00, '2024-01-30'),
+(29, 'Kabir Chawla',   5, 89000.00, '2022-12-05'),
+(30, 'Rhea Thomas',    5, 78000.00, '2023-08-14');
+
+-- ============================================================
+-- 5. INSERT EMPLOYEE-PROJECT ASSIGNMENTS (30 RECORDS)
+-- ============================================================
+
+INSERT INTO Employee_Project (emp_id, project_id, hours_worked) VALUES
+(1,205,145), (2,201,110), (3,205,160), (4,203,90),  (5,204,125),
+(6,207,80),  (7,202,105), (8,208,115), (9,203,75),  (10,202,135),
+(11,206,100),(12,207,70), (13,204,150),(14,205,130),(15,202,165),
+(16,208,95), (17,201,120),(18,206,85), (19,203,105),(20,207,90),
+(21,208,65), (22,203,100),(23,206,140),(24,207,75), (25,201,130),
+(26,206,95), (27,204,155),(28,208,80), (29,205,145),(30,201,105);
+
+-- ============================================================
+-- 6. SELECTION (WHERE)
+-- Display employees hired from 2023 onward whose salary > 75,000.
+-- ============================================================
+
+SELECT emp_id, emp_name, salary, hire_date
+FROM Employee
+WHERE hire_date >= '2023-01-01'
+  AND salary > 75000
+ORDER BY hire_date ASC;
+
+-- ============================================================
+-- 7. PROJECTION
+-- Display only employee name, salary, and department ID.
+-- ============================================================
+
+SELECT emp_name, salary, dept_id
+FROM Employee
+ORDER BY emp_name ASC;
+
+-- ============================================================
+-- 8. AGGREGATE FUNCTIONS + GROUP BY
+-- COUNT, SUM, AVG, MIN, MAX for each department.
+-- ============================================================
+
+SELECT d.dept_id,
+       d.dept_name,
+       COUNT(e.emp_id) AS staff_count,
+       SUM(e.salary) AS total_payroll,
+       ROUND(AVG(e.salary), 2) AS average_salary,
+       MIN(e.salary) AS lowest_salary,
+       MAX(e.salary) AS highest_salary
+FROM Department AS d
+JOIN Employee AS e ON e.dept_id = d.dept_id
+GROUP BY d.dept_id, d.dept_name
+ORDER BY total_payroll DESC;
+
+-- ============================================================
+-- 9. HAVING
+-- Show departments whose total payroll is greater than 430,000.
+-- ============================================================
+
+SELECT d.dept_name,
+       COUNT(e.emp_id) AS staff_count,
+       SUM(e.salary) AS total_payroll
+FROM Department AS d
+JOIN Employee AS e ON e.dept_id = d.dept_id
+GROUP BY d.dept_id, d.dept_name
+HAVING SUM(e.salary) > 430000
+ORDER BY total_payroll DESC;
+
+-- ============================================================
+-- 10. CASE EXPRESSION
+-- Categorize employees by salary.
+-- ============================================================
+
+SELECT emp_name,
+       salary,
+       CASE
+           WHEN salary >= 90000 THEN 'Executive'
+           WHEN salary >= 75000 THEN 'Professional'
+           ELSE 'Associate'
+       END AS salary_level
+FROM Employee
+ORDER BY salary DESC, emp_name ASC;
+
+-- ============================================================
+-- 11. PROJECT-WISE WORKLOAD (JOIN + GROUP BY + AGGREGATES)
+-- LEFT JOIN ensures projects with no assignments would still appear.
+-- ============================================================
+
+SELECT p.project_id,
+       p.project_name,
+       COUNT(ep.emp_id) AS assigned_employees,
+       COALESCE(SUM(ep.hours_worked), 0) AS total_hours,
+       ROUND(AVG(ep.hours_worked), 2) AS average_hours
+FROM Project AS p
+LEFT JOIN Employee_Project AS ep ON ep.project_id = p.project_id
+GROUP BY p.project_id, p.project_name
+ORDER BY total_hours DESC, p.project_name ASC;
+
+-- ============================================================
+-- 12. EMPLOYEES WITH MORE THAN 120 HOURS ON THEIR PROJECT
+-- ============================================================
+
+SELECT e.emp_name,
+       p.project_name,
+       ep.hours_worked
+FROM Employee AS e
+JOIN Employee_Project AS ep ON ep.emp_id = e.emp_id
+JOIN Project AS p ON p.project_id = ep.project_id
+WHERE ep.hours_worked > 120
+ORDER BY ep.hours_worked DESC, e.emp_name ASC;
+
+-- ============================================================
+-- 13. VERIFY RECORD COUNTS
+-- Expected: 5 departments, 8 projects, 30 employees, 30 assignments.
+-- ============================================================
+
+SELECT 'Department' AS table_name, COUNT(*) AS record_count FROM Department
+UNION ALL
+SELECT 'Project', COUNT(*) FROM Project
+UNION ALL
+SELECT 'Employee', COUNT(*) FROM Employee
+UNION ALL
+SELECT 'Employee_Project', COUNT(*) FROM Employee_Project;
+
+-- Optional: inspect complete tables
+-- SELECT * FROM Department;
+-- SELECT * FROM Project;
+-- SELECT * FROM Employee;
+-- SELECT * FROM Employee_Project;
